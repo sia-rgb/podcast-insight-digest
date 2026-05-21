@@ -1,5 +1,6 @@
 # 本地配置和生成文件
 README-template.md
+data/
 
 # Python相关
 __pycache__/
@@ -38,6 +39,7 @@ tasks/
 runs/
 
 # 测试中间结果文件
+data/audio/
 
 
 # 环境变量配置文件
