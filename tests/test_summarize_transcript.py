@@ -7,6 +7,7 @@ from src.summarize_transcript import (
     build_summary_filename,
     build_chunk_note_prompt,
     build_user_prompt,
+    extract_guest_role_from_summary,
     load_env_values,
     output_path,
     retry_call,
@@ -44,19 +45,62 @@ class SummarizeTranscriptTest(unittest.TestCase):
 
         self.assertEqual(chunks, ["第一行\n第二行", "第三行"])
 
-    def test_build_summary_filename_uses_episode_guest_and_role(self):
-        title = "140. 对姚顺宇的4小时访谈：请允许我小疯一下！在Anthropic和Gemini训模型、技术预测、英雄主义已过去"
+    def test_extract_guest_role_from_summary_uses_basic_intro_section(self):
+        summary = """# 访谈总结报告
 
-        filename = build_summary_filename(title)
+## 一、访谈主题概览
 
-        self.assertEqual(filename, "140-姚顺宇-Google科学家.md")
+## 二、被访谈人基本介绍
+
+1. **姓名/职业身份**：苏煜，俄亥俄州立大学计算机系教授，New Cognition创始人。
+2. **教育背景**：原文未明确提及。
+
+## 三、核心观点、讨论主题与案例
+"""
+
+        guest, role = extract_guest_role_from_summary(summary)
+
+        self.assertEqual(guest, "苏煜")
+        self.assertEqual(role, "俄亥俄州立大学计算机系教授")
+
+    def test_extract_guest_role_from_summary_removes_host_and_uses_current_role(self):
+        summary = """# 访谈总结报告
+
+## 二、被访谈人基本介绍
+
+1. **访谈人姓名/职业身份**：苏煜（嘉宾）、小俊（主持人）。苏煜现任俄亥俄州立大学计算机教授，同时为AI创业公司New Cognition创始人，2025年斯隆研究奖得主。
+"""
+
+        guest, role = extract_guest_role_from_summary(summary)
+
+        self.assertEqual(guest, "苏煜")
+        self.assertEqual(role, "俄亥俄州立大学计算机教授")
+
+    def test_build_summary_filename_uses_episode_and_summary_guest_role(self):
+        title = "139. 【Agent的综述】和苏煜聊Agent技术史、OpenClaw Moment、边界的消弭和社会的辐射"
+        summary = """# 访谈总结报告
+
+## 二、被访谈人基本介绍
+
+1. **姓名/职业身份**：苏煜，俄亥俄州立大学计算机系教授，New Cognition创始人。
+"""
+
+        filename = build_summary_filename(title, summary)
+
+        self.assertEqual(filename, "139-苏煜-俄亥俄州立大学计算机系教授.md")
 
     def test_output_path_uses_episode_guest_and_role(self):
         payload = {
-            "title": "140. 对姚顺宇的4小时访谈：请允许我小疯一下！在Anthropic和Gemini训模型、技术预测、英雄主义已过去"
+            "title": "139. 【Agent的综述】和苏煜聊Agent技术史、OpenClaw Moment、边界的消弭和社会的辐射"
         }
+        summary = """# 访谈总结报告
 
-        self.assertEqual(str(output_path(payload)), "summaries\\140-姚顺宇-Google科学家.md")
+## 二、被访谈人基本介绍
+
+1. **姓名/职业身份**：苏煜，俄亥俄州立大学计算机系教授，New Cognition创始人。
+"""
+
+        self.assertEqual(str(output_path(payload, summary)), "summaries\\139-苏煜-俄亥俄州立大学计算机系教授.md")
 
     def test_build_user_prompt_uses_external_prompt_and_transcript(self):
         prompt = build_user_prompt(

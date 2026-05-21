@@ -19,10 +19,6 @@ DEFAULT_DEEPSEEK_BASE_URL = "https://api.deepseek.com"
 CHUNK_MAX_CHARS = 24000
 RETRY_ATTEMPTS = 3
 RETRY_SLEEP_SECONDS = 5
-KNOWN_GUEST_ROLES = {
-    "140": "Google科学家",
-}
-
 T = TypeVar("T")
 
 
@@ -62,24 +58,80 @@ def safe_filename_part(value: str) -> str:
     return re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", value).strip(" .")
 
 
-def build_summary_filename(title: str) -> str:
+def clean_intro_text(value: str) -> str:
+    text = re.sub(r"^[\s\d.、-]+", "", value.strip())
+    text = text.replace("**", "").replace("`", "")
+    return text.strip()
+
+
+def basic_intro_section(summary: str) -> str:
+    match = re.search(
+        r"##\s*二、被访谈人基本介绍\s*(.*?)(?=\n##\s*三、|\Z)",
+        summary,
+        flags=re.S,
+    )
+    return match.group(1).strip() if match else summary
+
+
+def split_guest_role(value: str) -> tuple[str, str]:
+    def clean_person_name(name: str) -> str:
+        first_person = re.split(r"[、/]", name, maxsplit=1)[0]
+        return re.sub(r"[（(].*?[）)]", "", first_person).strip()
+
+    def clean_role(role_value: str) -> str:
+        return re.sub(r"^(是|为|担任)", "", role_value).strip()
+
+    parts = [
+        part.strip()
+        for part in re.split(r"[，,；;。]\s*", value)
+        if part.strip()
+    ]
+    guest = clean_person_name(parts[0]) if parts else "嘉宾"
+    role = "嘉宾"
+    if guest != "嘉宾":
+        current_role_match = re.search(
+            rf"{re.escape(guest)}(?:现任|现为|目前任|目前是|当前任|当前为|现在是)(.+?)(?:，|,|；|;|。|同时|并|$)",
+            value,
+        )
+        if current_role_match:
+            role = clean_role(current_role_match.group(1))
+        elif len(parts) > 1:
+            role = clean_role(parts[1])
+    return guest, role
+
+
+def extract_guest_role_from_summary(summary: str) -> tuple[str, str]:
+    section = basic_intro_section(summary)
+    lines = [clean_intro_text(line) for line in section.splitlines() if line.strip()]
+    candidates = [
+        line
+        for line in lines
+        if "姓名" in line and ("职业" in line or "身份" in line or "访谈人" in line)
+    ]
+    target = candidates[0] if candidates else (lines[0] if lines else "")
+
+    if "：" in target:
+        target = target.split("：", 1)[1]
+    elif ":" in target:
+        target = target.split(":", 1)[1]
+
+    guest, role = split_guest_role(target)
+    return guest or "嘉宾", role or "嘉宾"
+
+
+def build_summary_filename(title: str, summary: str) -> str:
     number_match = re.match(r"(\d+)\.", title)
     if not number_match:
         raise ValueError(f"Cannot parse episode number from title: {title}")
     episode_number = number_match.group(1)
 
-    guest_match = re.search(r"对(.+?)的", title)
-    if not guest_match:
-        raise ValueError(f"Cannot parse guest name from title: {title}")
-    guest_name = guest_match.group(1)
-
-    role = KNOWN_GUEST_ROLES.get(episode_number, "嘉宾")
+    guest_name, role = extract_guest_role_from_summary(summary)
     filename = f"{episode_number}-{guest_name}-{role}.md"
     return safe_filename_part(filename)
 
 
-def output_path(payload: dict[str, Any]) -> Path:
-    return SUMMARY_DIR / build_summary_filename(str(payload["title"]))
+def output_path(payload: dict[str, Any], summary: str) -> Path:
+    return SUMMARY_DIR / build_summary_filename(str(payload["title"]), summary)
 
 
 def load_transcript(episode_number: str) -> dict[str, Any]:
@@ -226,7 +278,7 @@ def summarize_transcript(payload: dict[str, Any], env_values: dict[str, str]) ->
 
 def write_summary(payload: dict[str, Any], summary: str) -> Path:
     SUMMARY_DIR.mkdir(parents=True, exist_ok=True)
-    path = output_path(payload)
+    path = output_path(payload, summary)
     with path.open("w", encoding="utf-8") as file:
         file.write(summary.strip() + "\n")
     return path

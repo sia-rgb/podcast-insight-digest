@@ -1,7 +1,9 @@
 # 本地配置和生成文件
 data/
-tests/
-doc/
+tests/*
+docs/
+logs/
+!tests/test_run_pipeline.py
 
 # Python相关
 __pycache__/
@@ -34,6 +36,7 @@ Thumbs.db
 
 # 临时文件和日志
 *.log
+logs/
 *.tmp
 *.temp
 tasks/
