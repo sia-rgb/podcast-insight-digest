@@ -1,11 +1,15 @@
 import unittest
+from unittest.mock import Mock
 
 from src.summarize_transcript import (
-    build_final_prompt,
     build_transcript_text,
     chunk_text,
+    build_summary_filename,
+    build_chunk_note_prompt,
+    build_user_prompt,
     load_env_values,
     output_path,
+    retry_call,
 )
 
 
@@ -40,19 +44,50 @@ class SummarizeTranscriptTest(unittest.TestCase):
 
         self.assertEqual(chunks, ["第一行\n第二行", "第三行"])
 
-    def test_output_path_uses_episode_number(self):
-        self.assertEqual(str(output_path("140")), "data\\summaries\\140_summary.md")
+    def test_build_summary_filename_uses_episode_guest_and_role(self):
+        title = "140. 对姚顺宇的4小时访谈：请允许我小疯一下！在Anthropic和Gemini训模型、技术预测、英雄主义已过去"
 
-    def test_final_prompt_uses_updated_summary_structure(self):
-        prompt = build_final_prompt("标题", ["中间笔记"])
+        filename = build_summary_filename(title)
 
-        self.assertIn("## 一句话概括", prompt)
-        self.assertIn("## 主题提炼", prompt)
-        self.assertIn("## 核心观点", prompt)
-        self.assertIn("## 专业术语简明备注", prompt)
-        self.assertIn("## 建议思考", prompt)
-        self.assertNotIn("## 术语汇总表", prompt)
-        self.assertIn("如果播客中有具体例子", prompt)
+        self.assertEqual(filename, "140-姚顺宇-Google科学家.md")
+
+    def test_output_path_uses_episode_guest_and_role(self):
+        payload = {
+            "title": "140. 对姚顺宇的4小时访谈：请允许我小疯一下！在Anthropic和Gemini训模型、技术预测、英雄主义已过去"
+        }
+
+        self.assertEqual(str(output_path(payload)), "summaries\\140-姚顺宇-Google科学家.md")
+
+    def test_build_user_prompt_uses_external_prompt_and_transcript(self):
+        prompt = build_user_prompt(
+            prompt_template="外部提示词",
+            title="标题",
+            transcript_text="转录文本",
+        )
+
+        self.assertIn("外部提示词", prompt)
+        self.assertIn("标题", prompt)
+        self.assertIn("转录文本", prompt)
+
+    def test_build_chunk_note_prompt_does_not_request_final_report(self):
+        prompt = build_chunk_note_prompt(
+            title="标题",
+            chunk="分块文本",
+            index=1,
+            total=2,
+        )
+
+        self.assertIn("中间笔记", prompt)
+        self.assertIn("不要输出完整访谈总结报告", prompt)
+        self.assertNotIn("访谈总结报告", prompt.replace("不要输出完整访谈总结报告", ""))
+
+    def test_retry_call_retries_once_after_connection_error(self):
+        calls = Mock(side_effect=[RuntimeError("connection"), "ok"])
+
+        result = retry_call(calls, max_attempts=2, sleep_seconds=0)
+
+        self.assertEqual(result, "ok")
+        self.assertEqual(calls.call_count, 2)
 
 
 if __name__ == "__main__":
