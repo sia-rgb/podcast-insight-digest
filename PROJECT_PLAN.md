@@ -4,10 +4,10 @@ PROJECT_PLAN.md
 将长时长中文播客访谈自动整理为结构化 Word 文档，支持单集独立输出并保留原始 transcript 数据，便于快速阅读和知识管理。
 
 2. Current State
-Current Stage: MVP 2
+Current Stage: MVP 3
 Stage Status: Minimal Validation Passed
 Last Updated: 2026-05-21
-整体项目状态：MVP 2 已完成最小验证。已使用腾讯云 ASR 通过音频 URL 完成第 128 集整集转录，并输出 raw transcript JSON / Markdown。
+整体项目状态：MVP 3 已完成最小验证。已使用 DeepSeek 将第 140 集 raw transcript 总结为结构化 Markdown。
 
 3. MVP Roadmap
 MVP 1: RSS 解析与音频下载
@@ -65,12 +65,12 @@ Do Not Do Yet:
 - 不处理其他音频或 RSS
 
 4. Active MVP
-Active MVP: MVP 2
-Current Task: 腾讯云 ASR 整集转录已通过最小验证
+Active MVP: MVP 3
+Current Task: 第 140 集结构化总结 Markdown 已通过最小验证
 Do Now:
-- 等待用户确认是否进入 MVP 3
+- 等待用户确认是否生成 Word 文档
 Do Not Do Yet:
-- 不做 Word 生成
+- 不做多集批量总结
 
 5. Update Policy
 本文件不写详细调试日志，仅记录项目状态变化
