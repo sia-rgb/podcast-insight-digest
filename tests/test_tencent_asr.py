@@ -4,6 +4,7 @@ from src.tencent_asr_episode import (
     build_transcript_payload,
     find_episode,
     load_env_values,
+    output_paths,
     render_markdown,
 )
 
@@ -20,16 +21,32 @@ class TencentAsrEpisodeTest(unittest.TestCase):
         self.assertEqual(values["TENCENTCLOUD_SECRET_KEY"], "key")
         self.assertEqual(values["TENCENTCLOUD_REGION"], "ap-shanghai")
 
-    def test_find_episode_matches_title_prefix(self):
+    def test_find_episode_matches_default_episode_number(self):
         episode = find_episode(
             [
                 {"title": "127. other", "audio_url": "https://example.com/127.m4a"},
                 {"title": "128. Manus决定出售前最后的访谈：啊", "audio_url": "https://example.com/128.m4a"},
-            ],
-            "128. Manus决定出售前最后的访谈",
+            ]
         )
 
         self.assertEqual(episode["audio_url"], "https://example.com/128.m4a")
+
+    def test_find_episode_matches_episode_number(self):
+        episode = find_episode(
+            [
+                {"title": "139. other", "audio_url": "https://example.com/139.m4a"},
+                {"title": "140. 对姚顺宇的4小时访谈", "audio_url": "https://example.com/140.m4a"},
+            ],
+            "140",
+        )
+
+        self.assertEqual(episode["audio_url"], "https://example.com/140.m4a")
+
+    def test_output_paths_use_episode_number(self):
+        json_path, markdown_path = output_paths("140")
+
+        self.assertEqual(str(json_path), "data\\transcripts\\140_tencent_asr_raw_transcript.json")
+        self.assertEqual(str(markdown_path), "data\\transcripts\\140_tencent_asr_raw_transcript.md")
 
     def test_build_transcript_payload_uses_result_detail_segments(self):
         raw_task = {

@@ -15,9 +15,7 @@ from tencentcloud.common.profile.http_profile import HttpProfile
 ENV_PATH = Path(".env")
 EPISODES_JSON = Path("data/episodes.json")
 TRANSCRIPT_DIR = Path("data/transcripts")
-JSON_OUTPUT = TRANSCRIPT_DIR / "128_tencent_asr_raw_transcript.json"
-MARKDOWN_OUTPUT = TRANSCRIPT_DIR / "128_tencent_asr_raw_transcript.md"
-TARGET_TITLE_PREFIX = "128. Manus决定出售前最后的访谈"
+DEFAULT_EPISODE_NUMBER = "128"
 DEFAULT_REGION = "ap-shanghai"
 ENGINE_MODEL_TYPE = "16k_zh_large"
 POLL_INTERVAL_SECONDS = 30
@@ -48,12 +46,18 @@ def load_episodes(path: Path = EPISODES_JSON) -> list[dict[str, Any]]:
 
 def find_episode(
     episodes: list[dict[str, Any]],
-    title_prefix: str = TARGET_TITLE_PREFIX,
+    episode_number: str = DEFAULT_EPISODE_NUMBER,
 ) -> dict[str, Any]:
+    title_prefix = f"{episode_number}."
     for episode in episodes:
         if str(episode.get("title", "")).startswith(title_prefix):
             return episode
-    raise ValueError(f"Episode not found: {title_prefix}")
+    raise ValueError(f"Episode not found: {episode_number}")
+
+
+def output_paths(episode_number: str) -> tuple[Path, Path]:
+    stem = f"{episode_number}_tencent_asr_raw_transcript"
+    return TRANSCRIPT_DIR / f"{stem}.json", TRANSCRIPT_DIR / f"{stem}.md"
 
 
 def create_client(env_values: dict[str, str]) -> asr_client.AsrClient:
@@ -164,17 +168,20 @@ def render_markdown(payload: dict[str, Any]) -> str:
     return "\n".join(lines) + "\n"
 
 
-def write_outputs(payload: dict[str, Any]) -> None:
+def write_outputs(payload: dict[str, Any], episode_number: str) -> tuple[Path, Path]:
+    json_output, markdown_output = output_paths(episode_number)
     TRANSCRIPT_DIR.mkdir(parents=True, exist_ok=True)
-    with JSON_OUTPUT.open("w", encoding="utf-8") as file:
+    with json_output.open("w", encoding="utf-8") as file:
         json.dump(payload, file, ensure_ascii=False, indent=2)
-    with MARKDOWN_OUTPUT.open("w", encoding="utf-8") as file:
+    with markdown_output.open("w", encoding="utf-8") as file:
         file.write(render_markdown(payload))
+    return json_output, markdown_output
 
 
 def main() -> int:
+    episode_number = sys.argv[1] if len(sys.argv) > 1 else DEFAULT_EPISODE_NUMBER
     env_values = load_env_values(ENV_PATH.read_text(encoding="utf-8"))
-    episode = find_episode(load_episodes())
+    episode = find_episode(load_episodes(), episode_number)
     client = create_client(env_values)
     task_id = submit_rec_task(client, episode["audio_url"])
     print(f"task_id: {task_id}")
@@ -185,11 +192,11 @@ def main() -> int:
         audio_url=episode["audio_url"],
         task=task,
     )
-    write_outputs(payload)
+    json_output, markdown_output = write_outputs(payload, episode_number)
 
     print(f"segments: {len(payload['segments'])}")
-    print(f"json: {JSON_OUTPUT}")
-    print(f"markdown: {MARKDOWN_OUTPUT}")
+    print(f"json: {json_output}")
+    print(f"markdown: {markdown_output}")
     return 0
 
 
