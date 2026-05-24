@@ -1,4 +1,4 @@
-# Podcast Insight Digest
+![Podcast Insight Digest](assets/banner.png)
 
 ## 一、项目概览
 
